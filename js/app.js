@@ -511,8 +511,8 @@ async function loadNews() {
     showNewsDemoBanner(false);
     renderNews(unique);
   } else {
-    // 3) 데모 폴백 (RSS 자체가 실패한 경우)
-    showNewsDemoBanner(true, 'no-rss');
+    // 3) 데모 폴백 (RSS 자체가 실패한 경우) — 배너 없이 조용히 표시
+    showNewsDemoBanner(false);
     renderNews(DEMO_NEWS);
   }
 

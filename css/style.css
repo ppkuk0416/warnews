@@ -288,25 +288,34 @@ body {
 }
 
 .translate-btn {
-  background: transparent;
-  border: 1px solid var(--border-bright);
-  color: var(--text-muted);
-  font-family: var(--font-body);
+  background: rgba(202, 138, 4, 0.12);
+  border: 1px solid rgba(202, 138, 4, 0.6);
+  color: var(--yellow-bright);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
-  padding: 4px 10px;
+  font-weight: 700;
+  padding: 5px 12px;
   border-radius: 3px;
   cursor: pointer;
+  letter-spacing: 0.5px;
   transition: all 0.2s;
+  box-shadow: 0 0 6px rgba(202, 138, 4, 0.25);
 }
 
-.translate-btn:hover { border-color: var(--yellow-bright); color: var(--yellow-bright); }
-.translate-btn.active {
-  background: rgba(202, 138, 4, 0.2);
+.translate-btn:hover {
+  background: rgba(202, 138, 4, 0.25);
   border-color: var(--yellow-bright);
-  color: var(--yellow-bright);
+  box-shadow: 0 0 10px rgba(202, 138, 4, 0.5);
 }
 
-/* 번역 중 스피너 */
+.translate-btn.active {
+  background: rgba(202, 138, 4, 0.35);
+  border-color: var(--yellow-bright);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(202, 138, 4, 0.6);
+}
+
+/* 번역 중 */
 .translate-btn.loading { opacity: 0.6; cursor: wait; }
 
 /* ── 뉴스 카드 출처 강화 ─────────────────────────────────── */
