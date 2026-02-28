@@ -12,7 +12,7 @@ app.use(cors());
 // GitHub Pages에서는 루트의 index.html을 서빙; 로컬도 동일하게 루트 서빙
 app.use(express.static('.', { index: 'index.html' }));
 
-const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
+const NEWS_API_KEY = process.env.NEWS_API_KEY || '4412f8e73cea40a18e35d76cb09cb176';
 const PORT = process.env.PORT || 3000;
 
 // ─── 뉴스 관련 키워드 ───────────────────────────────────────────────────────

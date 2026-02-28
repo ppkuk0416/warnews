@@ -5,9 +5,18 @@
 
 // ─── API 키 설정 ───────────────────────────────────────────
 // ★ 여기에 키를 입력하세요 ★
-// Alpha Vantage (무료 25회/일): https://alphavantage.co/support/#api-key
+
+// [뉴스] NewsAPI.org — 로컬 서버(server.js) 전용, GitHub Pages에서는 CORS 차단
+// https://newsapi.org  →  server.js에 이미 내장됨 (로컬 실행 시 자동 사용)
+
+// [뉴스] GNews.io — GitHub Pages에서 직접 사용 가능 (무료 100회/일, CORS 허용)
+// https://gnews.io/register 에서 무료 키 발급
+const GNEWS_KEY = '';           // 예: 'abc123def456...'
+
+// [주식] Alpha Vantage (무료 25회/일): https://alphavantage.co/support/#api-key
 const ALPHA_VANTAGE_KEY = '';   // 예: 'ABC123XYZ456'
-// rss2json.com (뉴스, 무료 10,000회/일): https://rss2json.com/#rss-feed
+
+// [뉴스RSS] rss2json.com (무료 10,000회/일): https://rss2json.com/#rss-feed
 const RSS2JSON_KEY = '';        // 없어도 동작, 있으면 요청 한도 증가
 
 // ─── 상수 설정 ─────────────────────────────────────────────
@@ -338,6 +347,25 @@ async function fetchRSSSource(source) {
     }));
 }
 
+// ─── GNews.io 직접 호출 (CORS 허용, 무료 100회/일) ────────
+async function fetchGNews() {
+  if (!GNEWS_KEY) return [];
+  const q = encodeURIComponent('iran usa war military nuclear');
+  const url = `https://gnews.io/api/v4/search?q=${q}&lang=en&max=20&sortby=publishedAt&token=${GNEWS_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`GNews HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.articles || []).map((a) => ({
+    title: a.title || '',
+    description: (a.description || '').slice(0, 300),
+    link: a.url || '#',
+    source: a.source?.name || 'GNews',
+    icon: '🌍',
+    timestamp: a.publishedAt ? new Date(a.publishedAt).getTime() : Date.now(),
+    urgent: isUrgent(a.title || ''),
+  }));
+}
+
 // ─── 뉴스 로드 ─────────────────────────────────────────────
 async function loadNews() {
   const btn = document.getElementById('news-refresh-btn');
@@ -347,12 +375,20 @@ async function loadNews() {
   feed.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>뉴스 수집 중...</p></div>';
 
   const allNews = [];
+
+  // 1) GNews (키 있을 때 — CORS 허용)
+  try {
+    const items = await fetchGNews();
+    allNews.push(...items);
+  } catch (_) {}
+
+  // 2) RSS via rss2json.com 프록시 (병렬)
   await Promise.allSettled(
     RSS_SOURCES.map(async (source) => {
       try {
         const items = await fetchRSSSource(source);
         allNews.push(...items);
-      } catch (_) { /* 개별 소스 실패는 무시 */ }
+      } catch (_) {}
     })
   );
 
@@ -362,6 +398,7 @@ async function loadNews() {
     showNewsDemoBanner(false);
     renderNews(unique);
   } else {
+    // 3) 데모 폴백
     showNewsDemoBanner(true);
     renderNews(DEMO_NEWS);
   }
