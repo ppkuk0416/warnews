@@ -312,11 +312,11 @@ function setBanner(id, show, html, parentSelector, beforeSelector) {
   }
 }
 
-function showNewsDemoBanner(show) {
-  setBanner('demo-news-banner', show,
-    `<span>⚠</span><span><strong>데모 모드</strong> — 시나리오 뉴스입니다. 실시간 뉴스: 서버 실행 후 <a href="https://newsapi.org" target="_blank" style="color:#06b6d4">newsapi.org</a> 키 설정</span>`,
-    '.news-panel', '.filter-bar'
-  );
+function showNewsDemoBanner(show, reason = '') {
+  const msg = reason === 'no-rss'
+    ? `<span>⚠</span><span><strong>뉴스 수집 실패</strong> — RSS 서버 연결 불가. 시나리오 데이터를 표시합니다.</span>`
+    : `<span>⚠</span><span><strong>데모 모드</strong> — RSS 연결 실패. 시나리오 데이터 표시 중.</span>`;
+  setBanner('demo-news-banner', show, msg, '.news-panel', '.filter-bar');
 }
 
 function showMarketDemoBanner(show) {
@@ -327,24 +327,32 @@ function showMarketDemoBanner(show) {
 }
 
 // ─── RSS via rss2json.com 프록시 ───────────────────────────
+function parseRSSItem(item, source) {
+  return {
+    title: item.title || '',
+    description: (item.description || '').replace(/<[^>]*>/g, '').slice(0, 300),
+    link: item.link || '#',
+    source: source.name,
+    icon: source.icon,
+    timestamp: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(),
+    urgent: isUrgent(item.title || ''),
+  };
+}
+
 async function fetchRSSSource(source) {
   const key = RSS2JSON_KEY ? `&api_key=${RSS2JSON_KEY}` : '';
-  const url = `${RSS2JSON}?rss_url=${encodeURIComponent(source.url)}&count=20${key}`;
+  const url = `${RSS2JSON}?rss_url=${encodeURIComponent(source.url)}&count=30${key}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (data.status !== 'ok') throw new Error(data.message || 'RSS fetch error');
-  return (data.items || [])
-    .filter((item) => isRelevant(item.title, item.description))
-    .map((item) => ({
-      title: item.title || '',
-      description: (item.description || '').replace(/<[^>]*>/g, '').slice(0, 300),
-      link: item.link || '#',
-      source: source.name,
-      icon: source.icon,
-      timestamp: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(),
-      urgent: isUrgent(item.title || ''),
-    }));
+
+  const items = data.items || [];
+  // 키워드 필터 먼저 시도
+  const filtered = items.filter((item) => isRelevant(item.title, item.description));
+  // 키워드에 하나도 안 걸리면 전체 기사 반환 (최신 10개)
+  const result = filtered.length > 0 ? filtered : items.slice(0, 10);
+  return result.map((item) => parseRSSItem(item, source));
 }
 
 // ─── GNews.io 직접 호출 (CORS 허용, 무료 100회/일) ────────
@@ -376,13 +384,13 @@ async function loadNews() {
 
   const allNews = [];
 
-  // 1) GNews (키 있을 때 — CORS 허용)
+  // 1) GNews (키 있을 때 — CORS 허용, 이미 키워드 검색)
   try {
     const items = await fetchGNews();
     allNews.push(...items);
   } catch (_) {}
 
-  // 2) RSS via rss2json.com 프록시 (병렬)
+  // 2) RSS via rss2json.com 프록시 (병렬, 키워드 없으면 전체 반환)
   await Promise.allSettled(
     RSS_SOURCES.map(async (source) => {
       try {
@@ -393,13 +401,19 @@ async function loadNews() {
   );
 
   if (allNews.length > 0) {
-    allNews.sort((a, b) => b.timestamp - a.timestamp);
+    // 키워드 매칭 기사를 앞으로 정렬
+    allNews.sort((a, b) => {
+      const aRel = isRelevant(a.title, a.description) ? 1 : 0;
+      const bRel = isRelevant(b.title, b.description) ? 1 : 0;
+      if (bRel !== aRel) return bRel - aRel;
+      return b.timestamp - a.timestamp;
+    });
     const unique = allNews.filter((item, idx, arr) => arr.findIndex((i) => i.title === item.title) === idx);
     showNewsDemoBanner(false);
     renderNews(unique);
   } else {
-    // 3) 데모 폴백
-    showNewsDemoBanner(true);
+    // 3) 데모 폴백 (RSS 자체가 실패한 경우)
+    showNewsDemoBanner(true, 'no-rss');
     renderNews(DEMO_NEWS);
   }
 
