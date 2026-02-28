@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ 미·이란 전쟁위기 실시간 대시보드</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;700&family=Oswald:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+
+  <!-- ══════════ 상단 경보 헤더 ══════════ -->
+  <header class="top-header">
+    <div class="header-left">
+      <div class="defcon-badge">
+        <span class="defcon-label">DEFCON</span>
+        <span class="defcon-number pulse-red">2</span>
+      </div>
+      <div class="header-title">
+        <span class="title-main">미·이란 전쟁위기 대시보드</span>
+        <span class="title-sub">US·IRAN WAR CRISIS — LIVE INTELLIGENCE DASHBOARD</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>LIVE</span>
+      </div>
+      <div class="header-time">
+        <div id="current-time" class="clock">--:--:--</div>
+        <div id="current-date" class="date">----·--·--</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════ 속보 티커 ══════════ -->
+  <div class="ticker-wrap">
+    <div class="ticker-tag">⚡ 속보</div>
+    <div class="ticker-viewport">
+      <div class="ticker-content" id="news-ticker">
+        <span>뉴스 로딩 중... 잠시만 기다려 주세요.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 메인 그리드 ══════════ -->
+  <main class="main-grid">
+
+    <!-- ── 뉴스 피드 (왼쪽) ── -->
+    <section class="panel news-panel">
+      <div class="panel-header">
+        <span class="panel-icon">📰</span>
+        <span class="panel-title">실시간 전쟁 속보</span>
+        <span class="panel-sub">BREAKING NEWS FEED</span>
+        <button class="refresh-btn" id="news-refresh-btn" onclick="loadNews(true)">↻ 새로고침</button>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">전체</button>
+        <button class="filter-btn" data-filter="reuters">Reuters</button>
+        <button class="filter-btn" data-filter="bbc">BBC</button>
+        <button class="filter-btn" data-filter="aljazeera">Al Jazeera</button>
+        <button class="filter-btn" data-filter="ap">AP</button>
+      </div>
+      <div class="news-feed" id="news-feed">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>뉴스 수집 중...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 마켓 패널 (오른쪽) ── -->
+    <aside class="panel markets-panel">
+
+      <!-- 위기 온도계 -->
+      <div class="threat-meter">
+        <div class="threat-label">위기 지수 THREAT LEVEL</div>
+        <div class="threat-bar-wrap">
+          <div class="threat-bar" id="threat-bar" style="width: 75%"></div>
+        </div>
+        <div class="threat-ticks">
+          <span>LOW</span><span>MODERATE</span><span>HIGH</span><span>CRITICAL</span>
+        </div>
+        <div class="threat-value" id="threat-value">HIGH — 75/100</div>
+      </div>
+
+      <!-- 암호화폐 -->
+      <div class="market-section">
+        <div class="market-section-title">
+          <span>💰</span>
+          <span>암호화폐 CRYPTO</span>
+        </div>
+        <div class="market-grid" id="crypto-grid">
+          <div class="market-card loading-card">BTC 로딩 중...</div>
+          <div class="market-card loading-card">ETH 로딩 중...</div>
+        </div>
+      </div>
+
+      <!-- 방산주 -->
+      <div class="market-section">
+        <div class="market-section-title">
+          <span>🛡️</span>
+          <span>방산주 DEFENSE STOCKS</span>
+        </div>
+        <div class="defense-grid" id="defense-grid">
+          <div class="defense-card loading-card">LMT 로딩...</div>
+          <div class="defense-card loading-card">RTX 로딩...</div>
+          <div class="defense-card loading-card">NOC 로딩...</div>
+          <div class="defense-card loading-card">GD 로딩...</div>
+        </div>
+        <div class="market-card wide loading-card" id="ita-card">ITA ETF 로딩...</div>
+      </div>
+
+      <!-- 원자재 -->
+      <div class="market-section">
+        <div class="market-section-title">
+          <span>🛢️</span>
+          <span>원자재 COMMODITIES</span>
+        </div>
+        <div class="market-grid" id="commodity-grid">
+          <div class="market-card loading-card">금 로딩...</div>
+          <div class="market-card loading-card">WTI 로딩...</div>
+        </div>
+      </div>
+
+      <!-- 주요 지수 -->
+      <div class="market-section">
+        <div class="market-section-title">
+          <span>📊</span>
+          <span>주요 지수 INDICES</span>
+        </div>
+        <div class="market-grid" id="index-grid">
+          <div class="market-card loading-card">S&P500 로딩...</div>
+          <div class="market-card loading-card">VIX 로딩...</div>
+        </div>
+      </div>
+
+      <!-- 환율 -->
+      <div class="market-section">
+        <div class="market-section-title">
+          <span>💱</span>
+          <span>안전자산 환율 FX</span>
+        </div>
+        <div class="market-grid" id="fx-grid">
+          <div class="market-card loading-card">USD/JPY 로딩...</div>
+          <div class="market-card loading-card">EUR/USD 로딩...</div>
+        </div>
+      </div>
+
+      <!-- 마켓 요약 분석 -->
+      <div class="analysis-box">
+        <div class="analysis-title">⚡ 시장 영향 분석 MARKET IMPACT</div>
+        <ul class="analysis-list" id="analysis-list">
+          <li>데이터 수집 중...</li>
+        </ul>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ══════════ 하단 상태바 ══════════ -->
+  <footer class="status-bar">
+    <div class="status-left">
+      <span class="status-dot"></span>
+      <span>시스템 정상 운영 중</span>
+    </div>
+    <div class="status-center">
+      마지막 업데이트: <span id="last-update">-</span>
+      &nbsp;|&nbsp;
+      뉴스 <span id="news-count">0</span>건
+    </div>
+    <div class="status-right">
+      다음 자동 갱신: <span id="countdown">60</span>초 후
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
