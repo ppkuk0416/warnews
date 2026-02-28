@@ -23,6 +23,16 @@ const RSS2JSON_KEY = '';        // 없어도 동작, 있으면 요청 한도 증
 const REFRESH_INTERVAL = 60;
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json';
 
+// ─── 뉴스 출처 정보 (국가·플래그·링크) ────────────────────
+const SOURCE_INFO = {
+  'Reuters':      { flag: '🇺🇸', country: '미국', url: 'https://reuters.com' },
+  'BBC World':    { flag: '🇬🇧', country: '영국', url: 'https://bbc.co.uk/news/world' },
+  'Al Jazeera':   { flag: '🇶🇦', country: '카타르', url: 'https://aljazeera.com' },
+  'The Guardian': { flag: '🇬🇧', country: '영국', url: 'https://theguardian.com/world' },
+  'AP News':      { flag: '🇺🇸', country: '미국', url: 'https://apnews.com' },
+  'GNews':        { flag: '🌍', country: '글로벌', url: 'https://gnews.io' },
+};
+
 const RSS_SOURCES = [
   { name: 'Reuters',     url: 'https://feeds.reuters.com/reuters/worldNews', icon: '📡' },
   { name: 'BBC World',   url: 'https://feeds.bbci.co.uk/news/world/rss.xml', icon: '🌐' },
@@ -85,6 +95,21 @@ let countdownTimer = null;
 let countdownVal = REFRESH_INTERVAL;
 let currentFilter = 'all';
 let allNewsData = [];
+let translateMode = false;
+
+// localStorage에서 번역 캐시 복원 (매번 API 안 써도 됨)
+const translationCache = (() => {
+  try {
+    return new Map(JSON.parse(localStorage.getItem('wnTransCache') || '[]'));
+  } catch (_) { return new Map(); }
+})();
+
+function saveTranslationCache() {
+  try {
+    const entries = [...translationCache.entries()].slice(-300);
+    localStorage.setItem('wnTransCache', JSON.stringify(entries));
+  } catch (_) {}
+}
 
 // ─── 시계 ──────────────────────────────────────────────────
 function updateClock() {
@@ -165,22 +190,42 @@ function renderNews(data) {
   }
 
   feed.innerHTML = filtered.map((item) => {
+    const info = SOURCE_INFO[item.source] || { flag: '🌐', country: '', url: '#' };
     const urgentTag = item.urgent ? '<span class="urgent-tag">⚡ 긴급</span>' : '';
     const desc = item.description ? `<p class="news-card-desc">${item.description}</p>` : '';
-    const link = item.link && item.link !== '#'
-      ? `<a href="${item.link}" target="_blank" rel="noopener noreferrer">${item.title}</a>`
-      : item.title;
+    const titleText = item.title;
+    const titleLink = item.link && item.link !== '#'
+      ? `<a href="${item.link}" target="_blank" rel="noopener noreferrer">${titleText}</a>`
+      : titleText;
+    const sourceLink = info.url && info.url !== '#'
+      ? `<a class="news-source-link" href="${info.url}" target="_blank" rel="noopener noreferrer">${info.flag} ${item.source}</a>`
+      : `<span class="news-source-link">${info.flag} ${item.source}</span>`;
+    const country = info.country ? `<span class="news-source-country">${info.country}</span>` : '';
+
+    // 캐시된 번역이 있으면 미리 삽입
+    const cached = translationCache.get(titleText);
+    const koHtml = `<div class="news-card-title-ko${cached ? '' : ' translating'}"
+      data-original="${titleText.replace(/"/g, '&quot;')}"
+    >${cached || '번역 대기 중...'}</div>`;
+
     return `
-      <div class="news-card ${item.urgent ? 'urgent' : ''}">
+      <div class="news-card ${item.urgent ? 'urgent' : ''}" data-source="${item.source}">
         <div class="news-card-meta">
-          <span class="news-source-badge">${item.icon || ''} ${item.source}</span>
+          ${sourceLink}
+          ${country}
           ${urgentTag}
           <span class="news-time">${timeAgo(item.timestamp)}</span>
         </div>
-        <div class="news-card-title">${link}</div>
+        <div class="news-card-title">${titleLink}</div>
+        ${koHtml}
         ${desc}
       </div>`;
   }).join('');
+
+  if (translateMode) {
+    document.getElementById('news-feed').classList.add('translate-active');
+    translateVisibleCards();
+  }
 
   document.getElementById('news-count').textContent = filtered.length;
   updateTicker(filtered);
@@ -324,6 +369,60 @@ function showMarketDemoBanner(show) {
     `<span>⚠</span><span><strong>시장 데이터 데모</strong> — 전쟁 시나리오 예시값 (실제값과 다름)</span>`,
     '.markets-panel', '.threat-meter'
   );
+}
+
+// ─── 번역 함수 (MyMemory 무료 API + localStorage 캐시) ────
+async function translateText(text) {
+  if (translationCache.has(text)) return translationCache.get(text);
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|ko`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+      const t = data.responseData.translatedText;
+      translationCache.set(text, t);
+      saveTranslationCache();
+      return t;
+    }
+  } catch (_) {}
+  return null; // 실패 시 null 반환
+}
+
+async function translateVisibleCards() {
+  const koEls = document.querySelectorAll('.news-card-title-ko');
+  for (const el of koEls) {
+    const original = el.dataset.original;
+    if (!original) continue;
+    if (!el.classList.contains('translating')) continue; // 이미 번역됨
+
+    const translated = await translateText(original);
+    if (translated) {
+      el.textContent = translated;
+      el.classList.remove('translating');
+    } else {
+      el.textContent = original; // 실패 시 원문 표시
+      el.classList.remove('translating');
+    }
+    // API 과부하 방지 (연속 호출 간격)
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+function toggleTranslation() {
+  translateMode = !translateMode;
+  const btn = document.getElementById('translate-btn');
+  const feed = document.getElementById('news-feed');
+
+  if (translateMode) {
+    btn.classList.add('active');
+    btn.textContent = '🇰🇷 번역 ON';
+    feed.classList.add('translate-active');
+    translateVisibleCards();
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🇰🇷 한국어';
+    feed.classList.remove('translate-active');
+  }
 }
 
 // ─── RSS via rss2json.com 프록시 ───────────────────────────
