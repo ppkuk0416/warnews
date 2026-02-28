@@ -605,7 +605,7 @@ async function loadMarkets() {
   );
 
   const isDemoMode = liveCount === 0;
-  showMarketDemoBanner(isDemoMode);
+  showMarketDemoBanner(false); // 배너 표시 안 함 (데모 모드여도 조용히)
 
   const data = isDemoMode ? DEMO_MARKETS : marketData;
   renderDefense(data);
@@ -741,4 +741,7 @@ document.querySelectorAll('.filter-btn').forEach((btn) => {
   const el = document.getElementById('last-update');
   if (el) el.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   startCountdown();
+
+  // 뉴스 독립 자동 새로고침: 정확히 60초마다
+  setInterval(() => loadNews(), 60000);
 })();
