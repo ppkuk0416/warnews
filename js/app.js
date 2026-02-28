@@ -135,6 +135,13 @@ function startCountdown() {
   }, 1000);
 }
 
+// 30초마다 모든 뉴스 카드의 시간 표시 갱신
+setInterval(() => {
+  document.querySelectorAll('.news-time[data-ts]').forEach((el) => {
+    el.textContent = timeAgo(Number(el.dataset.ts));
+  });
+}, 30000);
+
 // ─── 유틸 ──────────────────────────────────────────────────
 function timeAgo(ts) {
   const diff = Date.now() - ts;
@@ -214,7 +221,7 @@ function renderNews(data) {
           ${sourceLink}
           ${country}
           ${urgentTag}
-          <span class="news-time">${timeAgo(item.timestamp)}</span>
+          <span class="news-time" data-ts="${item.timestamp}">${timeAgo(item.timestamp)}</span>
         </div>
         <div class="news-card-title">${titleLink}</div>
         ${koHtml}

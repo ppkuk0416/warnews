@@ -468,9 +468,11 @@ body {
 
 .news-time {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: var(--text-dim);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
   margin-left: auto;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .urgent-tag {
