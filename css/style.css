@@ -681,6 +681,128 @@ body {
   border-color: var(--border-bright);
 }
 
+/* ── 펜타곤 피자 지수 ────────────────────────────────────── */
+.pizza-title-en {
+  font-size: 0.55rem;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.pizza-widget {
+  background: rgba(234, 88, 12, 0.05);
+  border: 1px solid rgba(234, 88, 12, 0.2);
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.pizza-score-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pizza-score-wrap { display: flex; align-items: baseline; gap: 3px; }
+
+.pizza-score {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--orange-bright);
+  line-height: 1;
+}
+
+.pizza-score-max {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.pizza-status-badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+
+.pizza-status-badge.normal  { color: var(--green-bright);  border-color: var(--green);  background: rgba(34,197,94,.1); }
+.pizza-status-badge.elevated{ color: var(--yellow-bright); border-color: var(--yellow); background: rgba(234,179,8,.1); }
+.pizza-status-badge.high    { color: var(--orange-bright); border-color: var(--orange); background: rgba(249,115,22,.1); }
+.pizza-status-badge.critical{ color: var(--red-bright);   border-color: var(--red);    background: rgba(239,68,68,.1); }
+
+.pizza-bar-wrap {
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pizza-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s ease;
+  background: linear-gradient(90deg, var(--green-bright) 0%, var(--yellow-bright) 45%, var(--orange-bright) 70%, var(--red-bright) 100%);
+  background-size: 600% 100%;
+}
+
+/* 스파크라인 */
+.pizza-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 28px;
+  margin-bottom: 8px;
+  padding: 2px 0;
+}
+
+.pizza-spark-bar {
+  flex: 1;
+  border-radius: 1px 1px 0 0;
+  background: rgba(234, 88, 12, 0.4);
+  transition: height 0.5s ease;
+  min-height: 2px;
+}
+
+.pizza-spark-bar.latest {
+  background: var(--orange-bright);
+}
+
+.pizza-sparkline-label {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--text-dim);
+  text-align: right;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.pizza-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.pizza-detail span {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+}
+
+.pizza-footnote {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 5px;
+}
+
 /* Analysis Box */
 .analysis-box {
   margin: 10px 12px;

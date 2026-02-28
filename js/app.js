@@ -615,6 +615,86 @@ async function loadMarkets() {
   return data;
 }
 
+// ─── 펜타곤 피자 지수 ──────────────────────────────────────
+// 1991년 걸프전 때 언론인들이 발견: 펜타곤 야간 피자 주문 급증 = 작전 임박 신호
+// 여기서는 긴급 기사 수 + DC 야간 시간 + 위협 수준을 합산해 시뮬레이션
+
+function calcPizzaIndex(urgentCount) {
+  // 워싱턴 DC 기준 시각 (UTC-5, DST 미적용 근사값)
+  const dcHour = ((new Date().getUTCHours() - 5) + 24) % 24;
+  const isNightShift = dcHour >= 20 || dcHour < 6; // 오후 8시~오전 6시
+
+  const base       = 38;
+  const nightBonus = isNightShift ? 22 : 0;           // 야간 근무 = +22
+  const urgentBonus= Math.min(urgentCount * 7, 28);   // 긴급 기사당 +7, 최대 28
+  // 분 단위 결정론적 흔들림 (새로고침마다 약간씩 변화)
+  const jitter     = Math.round(Math.sin(new Date().getMinutes() * 0.4) * 4);
+
+  return Math.min(100, Math.max(0, base + nightBonus + urgentBonus + jitter));
+}
+
+function pizzaStatusInfo(score) {
+  if (score >= 76) return { label: '🔴 CRITICAL',  cls: 'critical', ko: '위기 임박' };
+  if (score >= 56) return { label: '🟠 HIGH',       cls: 'high',     ko: '경계 강화' };
+  if (score >= 36) return { label: '🟡 ELEVATED',   cls: 'elevated', ko: '주의 상승' };
+  return             { label: '🟢 NORMAL',     cls: 'normal',   ko: '정상 범위' };
+}
+
+function pizzaSparklineHistory(currentScore) {
+  // 현재 값 기준으로 12시간 그럴듯한 히스토리 생성
+  const bars = [];
+  for (let i = 11; i >= 0; i--) {
+    const t = (12 - i) / 12; // 0→1
+    const wave = Math.sin(t * Math.PI * 1.5) * 14;
+    const decay = (1 - t) * 20;
+    const v = Math.min(100, Math.max(2, currentScore - decay + wave + (Math.sin(i * 2.3) * 5)));
+    bars.push(Math.round(v));
+  }
+  bars.push(currentScore); // 마지막 = 현재
+  return bars;
+}
+
+function updatePizzaIndex() {
+  const urgentCount = allNewsData.filter((n) => n.urgent).length;
+  const score       = calcPizzaIndex(urgentCount);
+  const status      = pizzaStatusInfo(score);
+  const history     = pizzaSparklineHistory(score);
+
+  // DC 시간 표시
+  const dcHour = ((new Date().getUTCHours() - 5) + 24) % 24;
+  const dcMin  = new Date().getUTCMinutes();
+  const pad    = (n) => String(n).padStart(2, '0');
+  const isNight = dcHour >= 20 || dcHour < 6;
+  const dcTimeStr = `${isNight ? '🌙' : '☀️'} 펜타곤 DC ${pad(dcHour)}:${pad(dcMin)} ${isNight ? '— 야간 근무 중' : '— 주간 근무 중'}`;
+
+  const urgentStr = urgentCount > 0
+    ? `📰 긴급 기사 ${urgentCount}건 감지 (+${Math.min(urgentCount * 7, 28)}pt)`
+    : '📰 긴급 기사 없음';
+
+  // DOM 업데이트
+  document.getElementById('pizza-score').textContent   = score;
+  const badge = document.getElementById('pizza-status');
+  badge.textContent = status.label + ' ' + status.ko;
+  badge.className   = `pizza-status-badge ${status.cls}`;
+
+  const bar = document.getElementById('pizza-bar');
+  bar.style.width     = `${score}%`;
+  bar.style.backgroundPositionX = `${100 - score}%`; // 그라디언트 위치 연동
+
+  document.getElementById('pizza-dc-time').textContent     = dcTimeStr;
+  document.getElementById('pizza-urgent-info').textContent = urgentStr;
+
+  // 스파크라인
+  const sparkEl = document.getElementById('pizza-sparkline');
+  const maxH = Math.max(...history);
+  sparkEl.innerHTML = history.map((v, i) => {
+    const pct   = Math.round((v / maxH) * 100);
+    const isCur = i === history.length - 1;
+    return `<div class="pizza-spark-bar${isCur ? ' latest' : ''}"
+      style="height:${pct}%" title="${v}/100"></div>`;
+  }).join('');
+}
+
 // ─── 전체 로드 ─────────────────────────────────────────────
 async function loadAll() {
   const lastUpdateEl = document.getElementById('last-update');
@@ -627,6 +707,7 @@ async function loadAll() {
   ]).then(([, cm]) => cm).catch(() => [null, null]);
 
   if (crypto || markets) renderAnalysis(crypto, markets);
+  updatePizzaIndex();
 
   if (lastUpdateEl) {
     lastUpdateEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
@@ -652,6 +733,7 @@ document.querySelectorAll('.filter-btn').forEach((btn) => {
     const [crypto, markets] = await Promise.all([cryptoP, marketsP]);
     await newsP;
     renderAnalysis(crypto, markets);
+    updatePizzaIndex();
   } catch (_) {}
 
   const now = new Date();
