@@ -3,6 +3,13 @@
    GitHub Pages 호환: 모든 API를 브라우저에서 직접 호출
    ═══════════════════════════════════════════════════════════ */
 
+// ─── API 키 설정 ───────────────────────────────────────────
+// ★ 여기에 키를 입력하세요 ★
+// Alpha Vantage (무료 25회/일): https://alphavantage.co/support/#api-key
+const ALPHA_VANTAGE_KEY = '';   // 예: 'ABC123XYZ456'
+// rss2json.com (뉴스, 무료 10,000회/일): https://rss2json.com/#rss-feed
+const RSS2JSON_KEY = '';        // 없어도 동작, 있으면 요청 한도 증가
+
 // ─── 상수 설정 ─────────────────────────────────────────────
 const REFRESH_INTERVAL = 60;
 const RSS2JSON = 'https://api.rss2json.com/v1/api.json';
@@ -312,7 +319,8 @@ function showMarketDemoBanner(show) {
 
 // ─── RSS via rss2json.com 프록시 ───────────────────────────
 async function fetchRSSSource(source) {
-  const url = `${RSS2JSON}?rss_url=${encodeURIComponent(source.url)}&count=20`;
+  const key = RSS2JSON_KEY ? `&api_key=${RSS2JSON_KEY}` : '';
+  const url = `${RSS2JSON}?rss_url=${encodeURIComponent(source.url)}&count=20${key}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
@@ -379,7 +387,28 @@ async function loadCrypto() {
   }
 }
 
-// ─── 주식/원자재 로드 (Yahoo Finance 직접 → 데모 폴백) ────
+// ─── Alpha Vantage로 주식 1개 조회 ────────────────────────
+// ALPHA_VANTAGE_KEY 가 설정된 경우에만 호출됨
+async function fetchAlphaVantage(sym) {
+  // Alpha Vantage는 특수문자 심볼(^GSPC, GC=F 등)을 지원하지 않으므로 주식만 처리
+  const stockMap = { 'LMT': 'LMT', 'RTX': 'RTX', 'NOC': 'NOC', 'GD': 'GD', 'ITA': 'ITA' };
+  if (!stockMap[sym]) return null;
+  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${sym}&apikey=${ALPHA_VANTAGE_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const q = json['Global Quote'];
+  if (!q || !q['05. price']) throw new Error('no data');
+  const price = parseFloat(q['05. price']);
+  const prev  = parseFloat(q['08. previous close']);
+  return {
+    symbol: sym, price, previousClose: prev,
+    change: price - prev, changePct: parseFloat(q['10. change percent']),
+    currency: 'USD', shortName: sym,
+  };
+}
+
+// ─── 주식/원자재 로드 (Alpha Vantage → Yahoo Finance → 데모 폴백) ─
 async function loadMarkets() {
   const symbols = ['LMT', 'RTX', 'NOC', 'GD', 'ITA', '^GSPC', '^VIX', 'GC=F', 'CL=F', 'BZ=F', 'JPY=X', 'EURUSD=X'];
   const marketData = {};
@@ -387,6 +416,15 @@ async function loadMarkets() {
 
   await Promise.allSettled(
     symbols.map(async (sym) => {
+      // 1) Alpha Vantage 키가 있으면 먼저 시도 (방산주 5개)
+      if (ALPHA_VANTAGE_KEY) {
+        try {
+          const d = await fetchAlphaVantage(sym);
+          if (d) { marketData[sym] = d; liveCount++; return; }
+        } catch (_) {}
+      }
+
+      // 2) Yahoo Finance 직접 시도
       try {
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=2d`;
         const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
@@ -403,6 +441,7 @@ async function loadMarkets() {
         };
         liveCount++;
       } catch (_) {
+        // 3) 데모 폴백
         marketData[sym] = DEMO_MARKETS[sym] || { symbol: sym, error: true };
       }
     })
