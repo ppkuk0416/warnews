@@ -445,20 +445,66 @@ function parseRSSItem(item, source) {
   };
 }
 
+// RSS XML을 직접 파싱 (allorigins 프록시 사용 시)
+function parseRSSXML(xml, source) {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    if (doc.querySelector('parsererror')) throw new Error('XML parse error');
+    const items = [...doc.querySelectorAll('item')];
+    if (!items.length) return [];
+
+    const parsed = items.map((item) => {
+      const getText = (tag) => (item.querySelector(tag)?.textContent || '').trim();
+      const title = getText('title');
+      if (!title) return null;
+      const description = getText('description').replace(/<[^>]*>/g, '').slice(0, 300);
+      const link = getText('link') || getText('guid') || '#';
+      const pubDate = getText('pubDate');
+      const ts = pubDate ? new Date(pubDate).getTime() : Date.now();
+      return {
+        title, description, link,
+        source: source.name, icon: source.icon,
+        timestamp: isNaN(ts) ? Date.now() : ts,
+        urgent: isUrgent(title),
+      };
+    }).filter(Boolean);
+
+    const filtered = parsed.filter((i) => isRelevant(i.title, i.description));
+    return filtered.length > 0 ? filtered : parsed.slice(0, 10);
+  } catch (_) { return []; }
+}
+
 async function fetchRSSSource(source) {
+  // 1순위: allorigins.win CORS 프록시 — 매번 원본에서 신선하게 가져옴 (캐시 없음)
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(source.url)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const items = parseRSSXML(await res.text(), source);
+      if (items.length > 0) return items;
+    }
+  } catch (_) {}
+
+  // 2순위: corsproxy.io 폴백
+  try {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(source.url)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) {
+      const items = parseRSSXML(await res.text(), source);
+      if (items.length > 0) return items;
+    }
+  } catch (_) {}
+
+  // 3순위: rss2json.com 폴백 (캐시 있지만 안정적)
   const key = RSS2JSON_KEY ? `&api_key=${RSS2JSON_KEY}` : '';
   const url = `${RSS2JSON}?rss_url=${encodeURIComponent(source.url)}&count=30${key}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  if (data.status !== 'ok') throw new Error(data.message || 'RSS fetch error');
-
-  const items = data.items || [];
-  // 키워드 필터 먼저 시도
-  const filtered = items.filter((item) => isRelevant(item.title, item.description));
-  // 키워드에 하나도 안 걸리면 전체 기사 반환 (최신 10개)
-  const result = filtered.length > 0 ? filtered : items.slice(0, 10);
-  return result.map((item) => parseRSSItem(item, source));
+  if (data.status !== 'ok') throw new Error(data.message || 'RSS error');
+  const all = data.items || [];
+  const filtered = all.filter((i) => isRelevant(i.title, i.description));
+  return (filtered.length > 0 ? filtered : all.slice(0, 10)).map((i) => parseRSSItem(i, source));
 }
 
 // ─── GNews.io 직접 호출 (CORS 허용, 무료 100회/일) ────────
@@ -481,12 +527,15 @@ async function fetchGNews() {
 }
 
 // ─── 뉴스 로드 ─────────────────────────────────────────────
-async function loadNews() {
+// silent=true : 자동 새로고침 — 현재 피드를 유지하며 백그라운드 갱신
+async function loadNews(force = false, silent = false) {
   const btn = document.getElementById('news-refresh-btn');
   if (btn) btn.textContent = '⟳ 로딩...';
 
   const feed = document.getElementById('news-feed');
-  feed.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>뉴스 수집 중...</p></div>';
+  if (!silent) {
+    feed.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>뉴스 수집 중...</p></div>';
+  }
 
   const allNews = [];
 
@@ -742,6 +791,6 @@ document.querySelectorAll('.filter-btn').forEach((btn) => {
   if (el) el.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   startCountdown();
 
-  // 뉴스 독립 자동 새로고침: 정확히 60초마다
-  setInterval(() => loadNews(), 60000);
+  // 뉴스 독립 자동 새로고침: 60초마다 silent 모드 (피드 유지, 백그라운드 갱신)
+  setInterval(() => loadNews(false, true), 60000);
 })();
