@@ -9,7 +9,8 @@ const cache = new NodeCache({ stdTTL: 60 });
 const xmlParser = new xml2js.Parser({ explicitArray: true, ignoreAttrs: false });
 
 app.use(cors());
-app.use(express.static('public'));
+// GitHub Pages에서는 루트의 index.html을 서빙; 로컬도 동일하게 루트 서빙
+app.use(express.static('.', { index: 'index.html' }));
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
 const PORT = process.env.PORT || 3000;
